@@ -1,0 +1,127 @@
+order_pizza <- function() {
+  cat("Welcome to Jenny's Pizza Order System!\n")
+  
+  sizes <- data.frame(
+    name = c("Small", "Medium", "Large"),
+    price = c(60, 90, 120)
+  )
+  
+  types <- c("Margherita", "Pepperoni", "Vegetarian", "BBQ Chicken")
+  
+  toppings <- data.frame(
+    name = c("Olives", "Mushrooms", "Onions", "Peppers", "Extra Cheese"),
+    price = c(8, 8, 6, 6, 12)
+  )
+  
+  get_single_choice <- function(options, prompt_text) {
+    repeat {
+      cat("\n", prompt_text, "\n", sep = "")
+      for (i in seq_along(options)) {
+        cat(i, "-", options[i], "\n")
+      }
+      
+      choice <- suppressWarnings(as.integer(readline("Enter your choice: ")))
+      
+      if (!is.na(choice) && choice >= 1 && choice <= length(options)) {
+        return(choice)
+      }
+      
+      cat("Invalid choice. Please try again.\n")
+    }
+  }
+  
+  get_quantity <- function() {
+    repeat {
+      quantity <- suppressWarnings(as.integer(readline("Enter quantity: ")))
+      
+      if (!is.na(quantity) && quantity > 0) {
+        return(quantity)
+      }
+      
+      cat("Invalid quantity. Please enter a positive number.\n")
+    }
+  }
+  
+  get_toppings <- function() {
+    repeat {
+      cat("\nChoose your toppings, separated by commas. Press Enter for no toppings:\n")
+      for (i in seq_len(nrow(toppings))) {
+        cat(i, "-", toppings$name[i], "- HK$", toppings$price[i], "\n")
+      }
+      
+      input <- trimws(readline("Enter your choices: "))
+      
+      if (input == "") {
+        return(integer(0))
+      }
+      
+      choices <- suppressWarnings(as.integer(trimws(strsplit(input, ",")[[1]])))
+      
+      if (all(!is.na(choices)) && all(choices >= 1) && all(choices <= nrow(toppings))) {
+        return(unique(choices))
+      }
+      
+      cat("Invalid topping choices. Please try again.\n")
+    }
+  }
+  
+  orders <- list()
+  
+  repeat {
+    size_choice <- get_single_choice(
+      paste0(sizes$name, " - HK$", sizes$price),
+      "Choose a pizza size:"
+    )
+    
+    type_choice <- get_single_choice(types, "Choose a pizza type:")
+    topping_choices <- get_toppings()
+    quantity <- get_quantity()
+    
+    base_price <- sizes$price[size_choice]
+    topping_price <- sum(toppings$price[topping_choices])
+    item_total <- (base_price + topping_price) * quantity
+    
+    order <- list(
+      size = sizes$name[size_choice],
+      type = types[type_choice],
+      toppings = toppings$name[topping_choices],
+      quantity = quantity,
+      item_total = item_total
+    )
+    
+    orders[[length(orders) + 1]] <- order
+    
+    another <- tolower(readline("\nWould you like to add another pizza? yes/no: "))
+    
+    if (another != "yes" && another != "y") {
+      break
+    }
+  }
+  
+  cat("\nYour Final Order Summary:\n")
+  grand_total <- 0
+  
+  for (i in seq_along(orders)) {
+    order <- orders[[i]]
+    
+    cat("\nPizza", i, "\n")
+    cat("Size:", order$size, "\n")
+    cat("Type:", order$type, "\n")
+    
+    if (length(order$toppings) == 0) {
+      cat("Toppings: None\n")
+    } else {
+      cat("Toppings:", paste(order$toppings, collapse = ", "), "\n")
+    }
+    
+    cat("Quantity:", order$quantity, "\n")
+    cat("Item Total: HK$", order$item_total, "\n")
+    
+    grand_total <- grand_total + order$item_total
+  }
+  
+  cat("\nGrand Total: HK$", grand_total, "\n")
+  cat("\nThank you for your order!\n")
+}
+
+order_pizza()

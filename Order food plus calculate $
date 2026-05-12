@@ -4,113 +4,175 @@ using System.Linq;
 
 class FoodOrderingSystem
 {
+    class MenuItem
+    {
+        public string Name { get; set; }
+        public string Category { get; set; }
+        public decimal Price { get; set; }
+
+        public MenuItem(string name, string category, decimal price)
+        {
+            Name = name;
+            Category = category;
+            Price = price;
+        }
+    }
+
+    class OrderItem
+    {
+        public MenuItem Item { get; set; }
+        public int Quantity { get; set; }
+
+        public OrderItem(MenuItem item, int quantity)
+        {
+            Item = item;
+            Quantity = quantity;
+        }
+
+        public decimal Total
+        {
+            get { return Item.Price * Quantity; }
+        }
+    }
+
     static void Main(string[] args)
     {
-        // Menu (using case-insensitive comparer)
-        var menu = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+        var menu = new List<MenuItem>
         {
-            { "Burger", 5.99 },
-            { "Pizza",  8.99 },
-            { "Pasta",  7.49 },
-            { "Salad",  4.99 },
-            { "Soda",   1.99 },
-            { "Fries",  2.49 }
+            new MenuItem("Burger", "Main", 5.99m),
+            new MenuItem("Pizza", "Main", 8.99m),
+            new MenuItem("Pasta", "Main", 7.49m),
+            new MenuItem("Salad", "Main", 4.99m),
+            new MenuItem("Fries", "Side", 2.49m),
+            new MenuItem("Wings", "Side", 6.49m),
+            new MenuItem("Soda", "Drink", 1.99m),
+            new MenuItem("Tea", "Drink", 1.49m),
+            new MenuItem("Ice Cream", "Dessert", 3.99m),
+            new MenuItem("Brownie", "Dessert", 2.99m)
         };
 
-        var order = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var order = new Dictionary<string, OrderItem>(StringComparer.OrdinalIgnoreCase);
 
         Console.WriteLine("=====================================");
         Console.WriteLine("   Welcome to the Food Ordering System");
-        Console.WriteLine("=====================================\n");
+        Console.WriteLine("=====================================");
 
-        Console.WriteLine("Menu:");
-        foreach (var item in menu.OrderBy(x => x.Key))
-        {
-            Console.WriteLine($"  {item.Key,-12} ${item.Value:F2}");
-        }
+        ShowHelp();
+        ShowMenu(menu);
 
         while (true)
         {
-            Console.Write("\nEnter food item (or 'done' to finish, 'remove' to cancel item): ");
-            string input = Console.ReadLine()?.Trim();
+            Console.Write("\nEnter item name or command: ");
+            string input = Console.ReadLine()?.Trim() ?? "";
 
             if (string.IsNullOrWhiteSpace(input))
                 continue;
 
-            string choice = input.ToLower();
-
-            if (choice == "done")
+            if (input.Equals("done", StringComparison.OrdinalIgnoreCase))
                 break;
 
-            if (choice == "remove")
+            if (input.Equals("menu", StringComparison.OrdinalIgnoreCase))
             {
-                RemoveItemFromOrder(order, menu);
+                ShowMenu(menu);
                 continue;
             }
 
-            if (!menu.ContainsKey(input))
+            if (input.Equals("help", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowHelp();
+                continue;
+            }
+
+            if (input.Equals("summary", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowCurrentOrderSummary(order);
+                continue;
+            }
+
+            if (input.Equals("remove", StringComparison.OrdinalIgnoreCase))
+            {
+                RemoveItemFromOrder(order);
+                continue;
+            }
+
+            if (input.Equals("clear", StringComparison.OrdinalIgnoreCase))
+            {
+                order.Clear();
+                Console.WriteLine("Your order has been cleared.");
+                continue;
+            }
+
+            MenuItem selectedItem = menu.FirstOrDefault(
+                item => item.Name.Equals(input, StringComparison.OrdinalIgnoreCase)
+            );
+
+            if (selectedItem == null)
             {
                 Console.WriteLine("Sorry, that item is not on the menu.");
                 continue;
             }
 
-            Console.Write($"How many {input}? ");
-            if (!int.TryParse(Console.ReadLine(), out int qty) || qty <= 0)
-            {
-                Console.WriteLine("Please enter a valid positive number.");
-                continue;
-            }
+            int quantity = ReadPositiveInteger($"How many {selectedItem.Name}? ");
 
-            if (order.ContainsKey(input))
-                order[input] += qty;
+            if (order.ContainsKey(selectedItem.Name))
+                order[selectedItem.Name].Quantity += quantity;
             else
-                order[input] = qty;
+                order[selectedItem.Name] = new OrderItem(selectedItem, quantity);
 
-            Console.WriteLine($"→ Added {qty} × {input}");
-            ShowCurrentOrderSummary(order, menu);
+            Console.WriteLine($"Added {quantity} x {selectedItem.Name}");
+            ShowCurrentOrderSummary(order);
         }
 
-        // Final order
         if (order.Count == 0)
         {
             Console.WriteLine("\nNo items were ordered. Goodbye!");
             return;
         }
 
-        Console.WriteLine("\n=====================================");
-        Console.WriteLine("          Your Final Order");
-        Console.WriteLine("=====================================");
-        
-        double total = 0;
-        foreach (var item in order.OrderBy(x => x.Key))
-        {
-            double cost = menu[item.Key] * item.Value;
-            Console.WriteLine($"  {item.Key,-12} x {item.Value,2}   ${cost,7:F2}");
-            total += cost;
-        }
-
-        Console.WriteLine("-------------------------------------");
-        Console.WriteLine($"  TOTAL:                         ${total:F2}");
-        Console.WriteLine("=====================================");
-        Console.WriteLine("Thank you! Enjoy your meal! 🍔🍕🥗");
+        Checkout(order);
     }
 
-    static void ShowCurrentOrderSummary(Dictionary<string, int> order, Dictionary<string, double> menu)
+    static void ShowHelp()
     {
-        if (order.Count == 0) return;
-
-        Console.WriteLine("\nCurrent order:");
-        double runningTotal = 0;
-        foreach (var item in order)
-        {
-            double cost = menu[item.Key] * item.Value;
-            Console.WriteLine($"  {item.Key,-12} x {item.Value,2}   ${cost,7:F2}");
-            runningTotal += cost;
-        }
-        Console.WriteLine($"  Current total:                 ${runningTotal:F2}");
+        Console.WriteLine("\nCommands:");
+        Console.WriteLine("  menu     - show menu again");
+        Console.WriteLine("  summary  - show current order");
+        Console.WriteLine("  remove   - remove an item or quantity");
+        Console.WriteLine("  clear    - clear the whole order");
+        Console.WriteLine("  done     - finish and checkout");
+        Console.WriteLine("  help     - show commands");
     }
 
-    static void RemoveItemFromOrder(Dictionary<string, int> order, Dictionary<string, double> menu)
+    static void ShowMenu(List<MenuItem> menu)
+    {
+        Console.WriteLine("\nMenu:");
+
+        foreach (var group in menu.GroupBy(item => item.Category))
+        {
+            Console.WriteLine($"\n{group.Key}:");
+
+            foreach (var item in group.OrderBy(item => item.Name))
+            {
+                Console.WriteLine($"  {item.Name,-12} ${item.Price,6:F2}");
+            }
+        }
+    }
+
+    static int ReadPositiveInteger(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine()?.Trim() ?? "";
+
+            if (int.TryParse(input, out int number) && number > 0)
+                return number;
+
+            Console.WriteLine("Please enter a valid positive number.");
+        }
+    }
+
+    static void ShowCurrentOrderSummary(Dictionary<string, OrderItem> order)
     {
         if (order.Count == 0)
         {
@@ -118,16 +180,143 @@ class FoodOrderingSystem
             return;
         }
 
-        Console.Write("Which item would you like to remove? ");
-        string itemToRemove = Console.ReadLine()?.Trim();
+        Console.WriteLine("\nCurrent order:");
 
-        if (string.IsNullOrWhiteSpace(itemToRemove) || !order.ContainsKey(itemToRemove))
+        decimal subtotal = 0;
+
+        foreach (var orderItem in order.Values.OrderBy(x => x.Item.Name))
+        {
+            Console.WriteLine(
+                $"  {orderItem.Item.Name,-12} x {orderItem.Quantity,2}   ${orderItem.Total,7:F2}"
+            );
+
+            subtotal += orderItem.Total;
+        }
+
+        Console.WriteLine($"  Subtotal:                      ${subtotal:F2}");
+    }
+
+    static void RemoveItemFromOrder(Dictionary<string, OrderItem> order)
+    {
+        if (order.Count == 0)
+        {
+            Console.WriteLine("Your order is empty.");
+            return;
+        }
+
+        ShowCurrentOrderSummary(order);
+
+        Console.Write("\nWhich item would you like to remove? ");
+        string itemName = Console.ReadLine()?.Trim() ?? "";
+
+        if (!order.ContainsKey(itemName))
         {
             Console.WriteLine("Item not found in your order.");
             return;
         }
 
-        order.Remove(itemToRemove);
-        Console.WriteLine($"→ Removed all {itemToRemove} from your order.");
+        Console.Write("Remove all of this item? yes/no: ");
+        string removeAll = Console.ReadLine()?.Trim() ?? "";
+
+        if (removeAll.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+            removeAll.Equals("y", StringComparison.OrdinalIgnoreCase))
+        {
+            order.Remove(itemName);
+            Console.WriteLine($"Removed all {itemName} from your order.");
+            return;
+        }
+
+        int quantityToRemove = ReadPositiveInteger("How many would you like to remove? ");
+
+        if (quantityToRemove >= order[itemName].Quantity)
+        {
+            order.Remove(itemName);
+            Console.WriteLine($"Removed all {itemName} from your order.");
+        }
+        else
+        {
+            order[itemName].Quantity -= quantityToRemove;
+            Console.WriteLine($"Removed {quantityToRemove} x {itemName}.");
+        }
+    }
+
+    static void Checkout(Dictionary<string, OrderItem> order)
+    {
+        Console.Write("\nPickup or delivery? ");
+        string orderType = Console.ReadLine()?.Trim() ?? "";
+
+        bool isDelivery = orderType.Equals("delivery", StringComparison.OrdinalIgnoreCase);
+
+        string customerName = ReadRequiredText("Enter your name: ");
+        string address = "";
+
+        if (isDelivery)
+            address = ReadRequiredText("Enter delivery address: ");
+
+        Console.Write("Enter discount code, or press Enter to skip: ");
+        string discountCode = Console.ReadLine()?.Trim() ?? "";
+
+        decimal subtotal = order.Values.Sum(item => item.Total);
+        decimal discount = CalculateDiscount(discountCode, subtotal);
+        decimal deliveryFee = isDelivery ? 3.99m : 0m;
+        decimal tax = (subtotal - discount) * 0.08m;
+        decimal total = subtotal - discount + tax + deliveryFee;
+
+        Console.WriteLine("\n=====================================");
+        Console.WriteLine("             FINAL RECEIPT");
+        Console.WriteLine("=====================================");
+        Console.WriteLine($"Customer: {customerName}");
+        Console.WriteLine($"Order Type: {(isDelivery ? "Delivery" : "Pickup")}");
+
+        if (isDelivery)
+            Console.WriteLine($"Address: {address}");
+
+        Console.WriteLine("-------------------------------------");
+
+        foreach (var orderItem in order.Values.OrderBy(x => x.Item.Name))
+        {
+            Console.WriteLine(
+                $"  {orderItem.Item.Name,-12} x {orderItem.Quantity,2}   ${orderItem.Total,7:F2}"
+            );
+        }
+
+        Console.WriteLine("-------------------------------------");
+        Console.WriteLine($"  Subtotal:                     ${subtotal,7:F2}");
+        Console.WriteLine($"  Discount:                    -${discount,7:F2}");
+        Console.WriteLine($"  Tax:                          ${tax,7:F2}");
+        Console.WriteLine($"  Delivery Fee:                 ${deliveryFee,7:F2}");
+        Console.WriteLine("-------------------------------------");
+        Console.WriteLine($"  TOTAL:                        ${total,7:F2}");
+        Console.WriteLine("=====================================");
+        Console.WriteLine("Thank you! Enjoy your meal!");
+    }
+
+    static string ReadRequiredText(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine()?.Trim() ?? "";
+
+            if (!string.IsNullOrWhiteSpace(input))
+                return input;
+
+            Console.WriteLine("This field cannot be empty.");
+        }
+    }
+
+    static decimal CalculateDiscount(string code, decimal subtotal)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return 0m;
+
+        if (code.Equals("SAVE10", StringComparison.OrdinalIgnoreCase))
+            return subtotal * 0.10m;
+
+        if (code.Equals("SAVE5", StringComparison.OrdinalIgnoreCase) && subtotal >= 20m)
+            return 5m;
+
+        Console.WriteLine("Invalid or unavailable discount code.");
+        return 0m;
     }
 }
